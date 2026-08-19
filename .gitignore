@@ -1,0 +1,14 @@
+data/
+*.parquet
+__pycache__/
+*.pyc
+results*.csv
+*_scan.csv
+.venv/
+
+# generated CA bundle (machine-specific, do not commit)
+data/ca_bundle.pem
+corp_ca_bundle.pem
+
+# runtime logs
+*.log
