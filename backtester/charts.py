@@ -13,8 +13,30 @@ _BENCH = "#64748b"
 _STRAT = "#2563eb"
 
 
-def price_chart(result, strategy, show_candles: bool = True) -> go.Figure:
-    """Price + strategy overlays + buy/sell markers, with an optional lower panel."""
+def _shade_inactive(fig, index, gate) -> None:
+    """Grey out the spans where the strategy was NOT allowed to trade."""
+    if gate is None:
+        return
+    g = gate.reindex(index).fillna(False).astype(bool).values
+    start = None
+    for i in range(len(g)):
+        if not g[i] and start is None:
+            start = index[i]
+        elif g[i] and start is not None:
+            fig.add_vrect(x0=start, x1=index[i], fillcolor="#94a3b8", opacity=0.12,
+                          line_width=0, layer="below", row=1, col=1)
+            start = None
+    if start is not None:
+        fig.add_vrect(x0=start, x1=index[-1], fillcolor="#94a3b8", opacity=0.12,
+                      line_width=0, layer="below", row=1, col=1)
+
+
+def price_chart(result, strategy, show_candles: bool = True, gate=None) -> go.Figure:
+    """Price + strategy overlays + win/loss markers, with an optional lower panel.
+
+    If ``gate`` (an allow/deny mask) is given, spans where the strategy could not
+    trade (outside its time window / regime) are shaded grey.
+    """
     df = result.ohlcv
     sub = strategy.subplot(df, **result.params)
     rows = 2 if sub else 1
@@ -24,6 +46,8 @@ def price_chart(result, strategy, show_candles: bool = True) -> go.Figure:
         rows=rows, cols=1, shared_xaxes=True, vertical_spacing=0.04,
         row_heights=heights,
     )
+
+    _shade_inactive(fig, df.index, gate)
 
     if show_candles:
         fig.add_trace(

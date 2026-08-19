@@ -68,6 +68,11 @@ def _hold(entries: pd.Series, exits: pd.Series) -> pd.Series:
     return pos
 
 
+# Public alias for custom-strategy authors: build a held position from
+# entry/exit boolean series.  ``from backtester.strategies import hold``
+hold = _hold
+
+
 # --------------------------------------------------------------------------- #
 # SMA / EMA crossover
 # --------------------------------------------------------------------------- #
@@ -199,11 +204,52 @@ _REGISTRY: dict[str, Strategy] = {
 }
 
 
+def register(strategy: Strategy) -> Strategy:
+    """Add (or replace) a strategy in the registry. Used by custom modules."""
+    _REGISTRY[strategy.key] = strategy
+    return strategy
+
+
+_custom_loaded = False
+
+
+def load_custom() -> None:
+    """Import every module under ``backtester/custom/`` so their register()
+    calls run. Modules whose name starts with ``_`` (e.g. the template) are
+    skipped. Import errors in one custom file don't break the rest.
+    """
+    global _custom_loaded
+    if _custom_loaded:
+        return
+    _custom_loaded = True
+
+    import importlib
+    import logging
+    import pkgutil
+
+    log = logging.getLogger(__name__)
+    try:
+        from . import custom as _custom_pkg
+    except Exception as exc:  # noqa: BLE001 - no custom package yet is fine
+        log.debug("No custom strategies package: %s", exc)
+        return
+
+    for mod in pkgutil.iter_modules(_custom_pkg.__path__):
+        if mod.name.startswith("_"):
+            continue
+        try:
+            importlib.import_module(f"{_custom_pkg.__name__}.{mod.name}")
+        except Exception as exc:  # noqa: BLE001 - surface but keep going
+            log.warning("Could not load custom strategy '%s': %s", mod.name, exc)
+
+
 def list_strategies() -> list[Strategy]:
+    load_custom()
     return list(_REGISTRY.values())
 
 
 def get_strategy(key: str) -> Strategy:
+    load_custom()
     if key not in _REGISTRY:
         raise KeyError(f"Unknown strategy '{key}'. Options: {list(_REGISTRY)}")
     return _REGISTRY[key]

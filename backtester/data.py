@@ -100,6 +100,21 @@ def get_ohlcv(
     return df
 
 
+def get_benchmark(
+    period: str = "5y", interval: str = "1d", refresh: bool = False
+) -> pd.DataFrame:
+    """OHLCV for the market benchmark used by regime gating.
+
+    Tries the Nifty 50 index (``^NSEI``); falls back to Nifty 500 (``^CRSLDX``).
+    Returns an empty frame if both fail (regime gate then allows everything).
+    """
+    for sym in ("^NSEI", "^CRSLDX"):
+        df = get_ohlcv(sym, period=period, interval=interval, refresh=refresh)
+        if not df.empty:
+            return df
+    return pd.DataFrame(columns=_OHLCV_COLS)
+
+
 def get_many(
     symbols: list[str],
     period: str = "5y",

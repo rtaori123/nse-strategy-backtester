@@ -51,6 +51,28 @@ def symbol_to_name() -> dict[str, str]:
     return {r["Symbol"].strip() + ".NS": r["Company Name"].strip() for r in load_rows()}
 
 
+def load_sectors() -> list[str]:
+    """Sorted list of distinct sectors (the NSE macro-industry column)."""
+    return sorted({r.get("Industry", "").strip() for r in load_rows() if r.get("Industry", "").strip()})
+
+
+def symbol_to_sector(suffix: str = ".NS") -> dict[str, str]:
+    """Map yfinance ticker -> sector name."""
+    return {r["Symbol"].strip() + suffix: r.get("Industry", "").strip() for r in load_rows()}
+
+
+def symbols_for_sectors(sectors: list[str] | None, suffix: str = ".NS") -> list[str]:
+    """Tickers belonging to any of ``sectors`` (all tickers if empty/None)."""
+    if not sectors:
+        return load_symbols(suffix)
+    wanted = {s.strip() for s in sectors}
+    return [
+        r["Symbol"].strip() + suffix
+        for r in load_rows()
+        if r.get("Industry", "").strip() in wanted
+    ]
+
+
 def refresh_universe(timeout: int = 20) -> int:
     """Fetch the current Nifty 500 list from NSE and overwrite the snapshot.
 

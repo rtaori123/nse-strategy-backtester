@@ -28,6 +28,8 @@ class BacktestResult:
     trades: pd.DataFrame         # entry/exit/return_pct/bars_held
     metrics: dict
     benchmark_metrics: dict
+    gate: pd.Series | None = None       # allow/deny mask (time ∧ regime), for charts
+    conditions: object | None = None    # the Conditions applied, if any
 
 
 def _extract_trades(
@@ -77,12 +79,25 @@ def run(
     params: dict | None = None,
     cost_bps: float = 5.0,
     symbol: str = "",
+    conditions=None,
+    benchmark_df=None,
 ) -> BacktestResult:
-    """Run ``strategy`` over OHLCV ``df`` and return a :class:`BacktestResult`."""
+    """Run ``strategy`` over OHLCV ``df`` and return a :class:`BacktestResult`.
+
+    If ``conditions`` (a :class:`backtester.conditions.Conditions`) is given, the
+    raw signal is gated by sector/time/regime and shaped by the swing cadence
+    before execution. ``benchmark_df`` feeds market-regime gating.
+    """
     params = params or {}
     close = df["Close"].astype(float)
 
-    signal = strategy.signals(df, **params)
+    raw_signal = strategy.signals(df, **params)
+    gate = None
+    if conditions is not None:
+        signal = conditions.apply(raw_signal, df, benchmark_df)
+        gate = conditions.gate_series(df, benchmark_df)
+    else:
+        signal = raw_signal
     # Execute next bar to avoid lookahead.
     position = signal.shift(1).fillna(0.0)
 
@@ -113,4 +128,6 @@ def run(
         trades=trades,
         metrics=m,
         benchmark_metrics=bench,
+        gate=gate,
+        conditions=conditions,
     )

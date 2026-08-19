@@ -45,15 +45,45 @@ python run_batch.py --strategy rsi_meanrev --period 3y --limit 100
 | `macd_crossover` | Long while MACD line > signal line                   |
 | `bollinger`      | Breakout (above upper band) or reversion (lower band)|
 
-**Add a strategy:** append one `Strategy` entry to `_REGISTRY` in
-`backtester/strategies.py` — the sidebar controls and charts pick it up
-automatically.
+**Add a built-in strategy:** append one `Strategy` entry to `_REGISTRY` in
+`backtester/strategies.py`.
+
+**Add your own (custom) strategy:** drop a file in `backtester/custom/` — copy
+`_template.py`, write your entry/exit rule with full OHLCV (incl. Volume), and
+call `register(Strategy(...))`. It auto-appears in the app + CLI. See
+`custom/example_inside_bar.py` for a working candle/volume example.
+
+## Conditions — sector / time / regime / cadence
+
+Any strategy can be **gated** so it only trades in the right context (set these
+in the sidebar "Conditions", or via CLI flags):
+
+- **Sector / symbols** — restrict the universe (e.g. only *Healthcare*, or a
+  manual watchlist).
+- **Time window** — only certain months (seasonality) or a date range.
+- **Market regime** — trade only when the Nifty is above/below its N-day MA.
+- **Swing cadence** — review/act only every N bars (or chosen weekdays),
+  **time-exit** after H bars, and a cooldown between trades.
+
+The universe scan then shows a **Strategy Scorecard** — pooled win rate,
+**expectancy per trade**, profit factor, % of stocks profitable — with a
+**sample-size warning** when there are too few trades to trust.
+
+> ⚠️ These are **in-sample** results and *overstate* live odds, especially with
+> few trades. Out-of-sample / walk-forward validation is the honest next step.
+
+CLI example:
+```bash
+python run_batch.py --strategy inside_bar_breakout --sectors Healthcare \
+    --months 3 --max-hold 5 --every 2 --regime-ma 50 --period 5y
+```
 
 ## How it works (no lookahead)
 
 Signals are generated on bar *t* and executed on bar *t+1*
 (`position = signal.shift(1)`), returns are position × close-to-close change
-minus a transaction cost on every position change. Long/flat only (v1).
+minus a transaction cost on every position change. Conditions gate the raw
+signal *before* that shift, so the no-lookahead guarantee holds. Long/flat only.
 
 ## Data notes
 
