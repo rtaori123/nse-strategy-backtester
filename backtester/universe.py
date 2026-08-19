@@ -36,9 +36,14 @@ def load_rows() -> list[dict[str, str]]:
         return list(csv.DictReader(fh))
 
 
+def _field(row: dict, key: str) -> str:
+    """Safe cell read: csv.DictReader yields None for missing cells."""
+    return (row.get(key) or "").strip()
+
+
 def load_symbols(suffix: str = ".NS") -> list[str]:
     """Return tickers ready for yfinance (NSE symbols get a ``.NS`` suffix)."""
-    return [r["Symbol"].strip() + suffix for r in load_rows()]
+    return [_field(r, "Symbol") + suffix for r in load_rows() if _field(r, "Symbol")]
 
 
 def load_tickers() -> list[str]:
@@ -48,17 +53,19 @@ def load_tickers() -> list[str]:
 
 def symbol_to_name() -> dict[str, str]:
     """Map yfinance ticker (e.g. ``RELIANCE.NS``) -> company name."""
-    return {r["Symbol"].strip() + ".NS": r["Company Name"].strip() for r in load_rows()}
+    return {_field(r, "Symbol") + ".NS": _field(r, "Company Name")
+            for r in load_rows() if _field(r, "Symbol")}
 
 
 def load_sectors() -> list[str]:
     """Sorted list of distinct sectors (the NSE macro-industry column)."""
-    return sorted({r.get("Industry", "").strip() for r in load_rows() if r.get("Industry", "").strip()})
+    return sorted({_field(r, "Industry") for r in load_rows() if _field(r, "Industry")})
 
 
 def symbol_to_sector(suffix: str = ".NS") -> dict[str, str]:
     """Map yfinance ticker -> sector name."""
-    return {r["Symbol"].strip() + suffix: r.get("Industry", "").strip() for r in load_rows()}
+    return {_field(r, "Symbol") + suffix: _field(r, "Industry")
+            for r in load_rows() if _field(r, "Symbol")}
 
 
 def symbols_for_sectors(sectors: list[str] | None, suffix: str = ".NS") -> list[str]:
@@ -67,9 +74,9 @@ def symbols_for_sectors(sectors: list[str] | None, suffix: str = ".NS") -> list[
         return load_symbols(suffix)
     wanted = {s.strip() for s in sectors}
     return [
-        r["Symbol"].strip() + suffix
+        _field(r, "Symbol") + suffix
         for r in load_rows()
-        if r.get("Industry", "").strip() in wanted
+        if _field(r, "Symbol") and _field(r, "Industry") in wanted
     ]
 
 
